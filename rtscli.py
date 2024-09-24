@@ -1,4 +1,5 @@
 import urwid
+import requests
 try:
     # For Python 3.0 and later
     from urllib.request import urlopen
@@ -28,6 +29,10 @@ with open("tickers.txt") as file:
 
 with open("alphavantage-creds.txt") as file:
     apikey = list(parse_lines(file.readlines()))[0]
+    
+
+with open("polygon-creds.txt") as file:
+    polygon_apikey = list(parse_lines(file.readlines()))[0]
 
 
 # Set up color scheme
@@ -38,7 +43,9 @@ palette = [
     ('getting quote', 'dark blue', ''),
     ('headers', 'white,bold', ''),
     ('change ', 'dark green', ''),
-    ('change negative', 'dark red', '')]
+    ('change negative', 'dark red', ''),
+    ('error', 'light red', ''),
+    ]
 
 header_text = urwid.Text(u' Stock Quotes')
 header = urwid.AttrMap(header_text, 'titlebar')
@@ -79,60 +86,64 @@ def calculate_gain(price_in, current_price, shares):
 
     return gain_per_share * int(shares), gain_percent
 
+#Get Stock Data Update
 def get_update():
     results = []
-
+    use_polygon = False  # Initialize use_polygon at the beginning of the function
+    
     try:
         for t in tickers:
             ticker_sym = t[1]
-            url = "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={}&apikey={}".format(ticker_sym, apikey)
-            res = loads(urlopen(url).read())
-            results.append(res["Global Quote"])
+            if not use_polygon:
+                # Alpha Vantage API call
+                url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker_sym}&apikey={apikey}"
+                response = urlopen(url)
+                res = loads(response.read())
+                if "Global Quote" in res and res["Global Quote"]:
+                    results.append(res["Global Quote"])
+                else:
+                    print(f"Unexpected response from Alpha Vantage for {ticker_sym}: {res}")
+                    use_polygon = True  # Switch to polygon.io if Alpha Vantage fails
+            
+            if use_polygon:
+                # Polygon.io API call
+                url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/prev?apiKey={polygon_apikey}"
+                response = requests.get(url)
+                res = response.json()
+                if "results" in res and res["results"]:
+                    polygon_data = res["results"][0]
+                    results.append({
+                        "01. symbol": ticker_sym,
+                        "05. price": str(polygon_data["c"]),
+                        "09. change": str(polygon_data["c"] - polygon_data["o"]),
+                        "10. change percent": f"{((polygon_data['c'] - polygon_data['o']) / polygon_data['o'] * 100):.2f}%"
+                    })
+                else:
+                    print(f"Unexpected response from Polygon.io for {ticker_sym}: {res}")
+
+        if not results:
+            return [('error', "No valid results obtained. Please check your tickers and try again.")]
+
+        updates = [
+            ('headers', u'Stock \t '.expandtabs(25)),
+            ('headers', u'Last Price \t Change '.expandtabs(5)),
+            ('headers', u'\t % Change '.expandtabs(5)),
+            ('headers', u'\t Gain '.expandtabs(3)),
+            ('headers', u'\t % Gain \n'.expandtabs(5))]
+
+        total_portfolio_change = 0.0
+
+        for i, r in enumerate(results):
+            pass  # Add your logic here
+
+        updates.append(('', '\n\n\nNet Portfolio Gain: '))
+        updates.append((get_color(total_portfolio_change), pos_neg_change(total_portfolio_change)))
+
+        return updates
+
     except Exception as err:
-        print(err)
-        return
-
-    updates = [
-        ('headers', u'Stock \t '.expandtabs(25)),
-        ('headers', u'Last Price \t Change '.expandtabs(5)),
-        ('headers', u'\t % Change '.expandtabs(5)),
-        ('headers', u'\t Gain '.expandtabs(3)),
-        ('headers', u'\t % Gain \n'.expandtabs(5)) ]
-
-    total_portfolio_change = 0.0
-
-    for i, r in enumerate(results):
-        change = float(r['09. change'])
-        percent_change = r['10. change percent']
-
-        append_text(updates, '{} \t '.format(tickers[i][0]), tabsize=25)
-        append_text(updates, '{} \t '.format(r['05. price']), tabsize=15)
-        append_text(
-            updates,
-            '{} \t {}% \t'.format(
-                pos_neg_change(change),
-                percent_change),
-            tabsize=13,
-            color=get_color(change))
-
-        gain = gain_percent = ''
-        if len(tickers[i]) > 2:
-            gain, gain_percent = calculate_gain(
-                price_in = tickers[i][2],
-                current_price = r['05. price'],
-                shares = tickers[i][3])
-
-            total_portfolio_change += gain
-
-        append_text(
-            updates,
-            '{} \t {}% \n'.format(pos_neg_change(gain), pos_neg_change(gain_percent)),
-            color=get_color(gain))
-
-    append_text(updates, '\n\n\nNet Portfolio Gain: ')
-    append_text(updates, pos_neg_change(total_portfolio_change), color=get_color(total_portfolio_change))
-
-    return updates
+        print(f"Error in get_update: {err}")
+        return [('error', f"Error fetching data: {err}. Please try again later.")]
 
 # Handle key presses
 def handle_input(key):
@@ -142,10 +153,16 @@ def handle_input(key):
     if key == 'Q' or key == 'q':
         raise urwid.ExitMainLoop()
 
+#Refresh
 def refresh(_loop, _data):
     main_loop.draw_screen()
-    quote_box.base_widget.set_text(get_update())
+    update_data = get_update()
+    if isinstance(update_data, list) and update_data:
+        quote_box.base_widget.set_text(update_data)
+    else:
+        quote_box.base_widget.set_text([('error', "Unable to fetch updates. Please try again later.")])
     main_loop.set_alarm_in(60, refresh)
+
 
 main_loop = urwid.MainLoop(layout, palette, unhandled_input=handle_input)
 

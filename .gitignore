@@ -1,5 +1,6 @@
 tickers.txt
 alphavantage-creds.txt
+polygon-creds.txtq
 
 # Compiled python modules.
 *.pyc
