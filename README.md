@@ -2,13 +2,49 @@
 <a target="_blank" href="https://opensource.org/licenses/MIT" title="License: MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg"></a> <a target="_blank" href="http://makeapullrequest.com" title="PRs Welcome"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
 
 - A stock ticker that runs in console
-- It grabs info from Google Finance Api every 10 seconds, or if you press R
+
+- It grabs info from several APIs and displays it in a nice UI
+
 - It's pretty simple but if you wanna read through a blog post instead: https://aranair.github.io/posts/2017/06/28/building-a-python-cli-stock-ticker-with-urwid/
 
-**NOTE!!**
-This has been changed to use https://www.alphavantage.co because Google Finance does not seem to work reliably anymore (IPs get blocked and it just plain out doesn't work)
+Here is a flow diagram of how this works:
 
-You can get a free API key with a limited number of queries per second and so this has been tweaked to just refresh every 60s now. Put the api-key into `alphavantage-creds.txt` and it should work as usual.
+[Start]
+   |
+   v
+[Initialize variables]
+   |
+   v
+[Enter main loop]
+   |
+   v
+[Attempt Alpha Vantage API]
+   |
+   +---> [Success] --> [Process data]
+   |
+   +---> [Failure] --> [Switch to Polygon API]
+                          |
+                          v
+                       [Attempt Polygon API]
+                          |
+                          +---> [Success] --> [Process data]
+                          |
+                          +---> [Failure] --> [Log error]
+   |
+   v
+[Update UI]
+   |
+   v
+[Wait for refresh interval]
+   |
+   v
+[Repeat main loop]
+
+
+**NOTE!!**
+This uses https://www.alphavantage.co because Google Finance does not seem to work reliably anymore (IPs get blocked and it just plain out doesn't work), and also the Polygon API is a bit more reliable.
+
+You can get a free API key with a limited number of queries per second and so this has been tweaked to just refresh every 60s now. Put the api-key into `alphavantage-creds.txt` or 'polygon-creds.txt' and it should work.
 
 ## Screenshot
 
@@ -16,15 +52,14 @@ You can get a free API key with a limited number of queries per second and so th
 
 ## Dependencies
 
-Currently this is dependent on the list below but the next step is to build this into an executable so
-all that stuff with python and pip can be skipped.
+Currently this is dependent on
 
 - Python2.7
 - pip
 - Bunch of other python packages
 
 ## Install via Pip
-
+There is a pip package available for this, but it is outdated.
 ```
 pip install rtscli
 ```
@@ -33,7 +68,7 @@ pip install rtscli
 
 ```bash
 $ cp tickers.txt.sample tickers.txt
-$ rtscli
+$ python rtscli.py
 ```
 
 ## Tickers.txt Sample
@@ -51,9 +86,6 @@ $ git clone git@github.com:aranair/rtscli.git
 $ pip install -e .
 $ rtscli
 ```
-## Future Developments
-
-Not sure if this is of interest to anyone but if you'll like to see anything on this, raise an issue or something.
 
 ## License
 

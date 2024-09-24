@@ -95,6 +95,12 @@ def calculate_gain(price_in, current_price, shares):
 def get_update():
     results = []
     use_polygon = False  # Initialize use_polygon at the beginning of the function 
+    updates = [
+           ('headers', u'Stock \t '.expandtabs(25)),
+           ('headers', u'Last Price \t Change '.expandtabs(5)),
+           ('headers', u'\t % Change '.expandtabs(5)),
+           ('headers', u'\t Gain '.expandtabs(3)),
+           ('headers', u'\t % Gain \n'.expandtabs(5))]
     try:
         for t in tickers:
             ticker_sym = t[1]
@@ -110,50 +116,36 @@ def get_update():
                     use_polygon = True  # Switch to polygon.io if Alpha Vantage fails
             
             if use_polygon:
-                # Polygon.io API call
-                today = date.today().isoformat()
-                #url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/range/1/day{today}/{today}?apiKey={polygon_apikey}"
                 url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/prev?apiKey={polygon_apikey}"
-                headers = {"Authorization": f"Bearer {polygon_apikey}"}
-                
-                # Debug: Print redacted URL
-                redacted_url = re.sub(r'apiKey=\w+', 'apiKey=REDACTED', url)
-                print(f"Debug: Requesting URL: {redacted_url}")
-                
-                response = requests.get(url, headers=headers)
-                print(f"Debug: Response status code: {response.status_code}")
-                print(f"Debug: Response content: {response.text[:100]}...")
+                response = requests.get(url)
+                res = response.json()
     
-                if response.status_code == 200:
-                    res = response.json()
-                    
-                # Process the response as before
-                else:
-                    print(f"Error: Received status code {response.status_code}")
-                    print(f"Response content: {response.text}")
-                    continue  # Skip to the next ticker
-                
-                if "results" in res and res["results"]:
-                    polygon_data = res["results"][0]
-                    results.append({
-                        "01. symbol": ticker_sym,
-                        "05. price": str(polygon_data["c"]),
-                        "09. change": str(polygon_data["c"] - polygon_data["o"]),
-                        "10. change percent": f"{((polygon_data['c'] - polygon_data['o']) / polygon_data['o'] * 100):.2f}%"
-                    })
-                else:
-                    print(f"Unexpected response from Polygon.io for {ticker_sym}: {res}")
+            if "results" in res and res["results"]:
+                polygon_data = res["results"][0]     
+     #           formatted_data = {
+     #               "01. symbol": ticker_sym,
+     #               "05. price": str(polygon_data["c"]),
+     #               "09. change": str(polygon_data["c"] - polygon_data["o"]),
+     #               "10. change percent": f"{((polygon_data['c'] - polygon_data['o']) / polygon_data['o'] * 100):.2f}%"
+     #           }
+     #           results.append(formatted_data)
+                change = polygon_data["c"] - polygon_data["o"]
+                percent_change = (change / polygon_data["o"]) * 100
+        
+                updates.extend([
+                     ('', f'{ticker_sym} \t '.expandtabs(25)),
+                     ('', f'{polygon_data["c"]:.2f} \t '.expandtabs(15)),
+                     (get_color(change), f'{pos_neg_change(change)} \t {percent_change:.2f}% \t'.expandtabs(13)),
+                 # Add Gain and % Gain if available in your tickers data
+                     ('', '\n')
+                 ])
+            else:
+                print(f"Unexpected response from Polygon.io for {ticker_sym}: {res}")
 
         if not results:
             return [('error', "No valid results obtained. Please check your tickers and try again.")]
 
-        updates = [
-            ('headers', u'Stock \t '.expandtabs(25)),
-            ('headers', u'Last Price \t Change '.expandtabs(5)),
-            ('headers', u'\t % Change '.expandtabs(5)),
-            ('headers', u'\t Gain '.expandtabs(3)),
-            ('headers', u'\t % Gain \n'.expandtabs(5))]
-
+    
         total_portfolio_change = 0.0
 
         for i, r in enumerate(results):
