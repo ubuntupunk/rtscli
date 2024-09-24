@@ -95,6 +95,7 @@ def calculate_gain(price_in, current_price, shares):
 def get_update():
     results = []
     use_polygon = False  # Initialize use_polygon at the beginning of the function 
+    
     updates = [
            ('headers', u'Stock \t '.expandtabs(25)),
            ('headers', u'Last Price \t Change '.expandtabs(5)),
@@ -119,30 +120,23 @@ def get_update():
                 url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/prev?apiKey={polygon_apikey}"
                 response = requests.get(url)
                 res = response.json()
-    
+            
             if "results" in res and res["results"]:
-                polygon_data = res["results"][0]     
-     #           formatted_data = {
-     #               "01. symbol": ticker_sym,
-     #               "05. price": str(polygon_data["c"]),
-     #               "09. change": str(polygon_data["c"] - polygon_data["o"]),
-     #               "10. change percent": f"{((polygon_data['c'] - polygon_data['o']) / polygon_data['o'] * 100):.2f}%"
-     #           }
-     #           results.append(formatted_data)
+                polygon_data = res["results"][0]
                 change = polygon_data["c"] - polygon_data["o"]
                 percent_change = (change / polygon_data["o"]) * 100
-        
+                
                 updates.extend([
-                     ('', f'{ticker_sym} \t '.expandtabs(25)),
-                     ('', f'{polygon_data["c"]:.2f} \t '.expandtabs(15)),
-                     (get_color(change), f'{pos_neg_change(change)} \t {percent_change:.2f}% \t'.expandtabs(13)),
-                 # Add Gain and % Gain if available in your tickers data
-                     ('', '\n')
-                 ])
+                    ('', f'{ticker_sym} \t '.expandtabs(25)),
+                    ('', f'{polygon_data["c"]:.2f} \t '.expandtabs(15)),
+                    (get_color(change), f'{pos_neg_change(change)} \t {percent_change:.2f}% \t'.expandtabs(13)),
+                    # Add Gain and % Gain if available in your tickers data
+                    ('', '\n')
+                ])
             else:
                 print(f"Unexpected response from Polygon.io for {ticker_sym}: {res}")
 
-        if not results:
+        if not updates:
             return [('error', "No valid results obtained. Please check your tickers and try again.")]
 
     
