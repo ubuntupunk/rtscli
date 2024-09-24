@@ -101,20 +101,31 @@ def get_update():
            ('headers', u'Last Price \t Change '.expandtabs(5)),
            ('headers', u'\t % Change '.expandtabs(5)),
            ('headers', u'\t Gain '.expandtabs(3)),
-           ('headers', u'\t % Gain \n'.expandtabs(5))]
+           ('headers', u'\t % Gain \n'.expandtabs(5))
+           ]
+    total_portfolio_gain = 0
+    
     try:
         for t in tickers:
             ticker_sym = t[1]
+            purchase_price = float(t[2])
+            num_shares = int(t[3])
+            
             if not use_polygon:
                 # Alpha Vantage API call
                 url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker_sym}&apikey={apikey}"
                 response = urlopen(url)
                 res = loads(response.read())
+                
                 if "Global Quote" in res and res["Global Quote"]:
-                    results.append(res["Global Quote"])
+                    data = res["Global Quote"]
+                    current_price = float(data["05. price"])
+                    change = float(data["09. change"])
+                    percent_change = float(data["10. change percent"].strip('%'))
                 else:
-                    print(f"Unexpected response from Alpha Vantage for {ticker_sym}: {res}")
-                    use_polygon = True  # Switch to polygon.io if Alpha Vantage fails
+                    print(f"Unexpected response from Alpha Vantage for {ticker_sym}")
+                    use_polygon = True # Switch to polygon.io if Alpha Vantage fails
+                    continue
             
             if use_polygon:
                 url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/prev?apiKey={polygon_apikey}"
@@ -123,30 +134,37 @@ def get_update():
             
             if "results" in res and res["results"]:
                 polygon_data = res["results"][0]
-                change = polygon_data["c"] - polygon_data["o"]
-                percent_change = (change / polygon_data["o"]) * 100
-                
-                updates.extend([
-                    ('', f'{ticker_sym} \t '.expandtabs(25)),
-                    ('', f'{polygon_data["c"]:.2f} \t '.expandtabs(15)),
-                    (get_color(change), f'{pos_neg_change(change)} \t {percent_change:.2f}% \t'.expandtabs(13)),
-                    # Add Gain and % Gain if available in your tickers data
-                    ('', '\n')
-                ])
+                current_price = polygon_data["c"]
+                #change = polygon_data["c"] - polygon_data["o"]
+                change = float(polygon_data["c"] - polygon_data["o"])
+                percent_change = float((change / polygon_data["o"]) * 100)
+
             else:
                 print(f"Unexpected response from Polygon.io for {ticker_sym}: {res}")
+
+             # Calculate portfolio gain
+            gain = (current_price - purchase_price) * num_shares
+            gain_percent = ((current_price - purchase_price) / purchase_price) * 100
+            total_portfolio_gain += gain
+
+            updates.extend([
+               ('', f'{t[0]} \t '.expandtabs(25)),
+               ('', f'{current_price:.2f} \t '.expandtabs(15)),
+               (get_color(change), f'{pos_neg_change(change)} \t {percent_change:.2f}% \t'.expandtabs(13)),
+               (get_color(gain), f'{pos_neg_change(gain):.2f} \t {gain_percent:.2f}%\n'.expandtabs(13))
+               ])
 
         if not updates:
             return [('error', "No valid results obtained. Please check your tickers and try again.")]
 
-    
-        total_portfolio_change = 0.0
+#        for i, r in enumerate(results):
+ #           pass  # Add your logic here
 
-        for i, r in enumerate(results):
-            pass  # Add your logic here
+ #       updates.append(('', '\n\n\nNet Portfolio Gain: '))
+  
+        updates.append(('', f'\nTotal Portfolio Gain: {pos_neg_change(total_portfolio_gain):.2f}'))
 
-        updates.append(('', '\n\n\nNet Portfolio Gain: '))
-        updates.append((get_color(total_portfolio_change), pos_neg_change(total_portfolio_change)))
+        #updates.append((get_color(total_portfolio_change), pos_neg_change(total_portfolio_change)))
 
         return updates
 
@@ -165,7 +183,9 @@ def handle_input(key):
 def refresh(_loop, _data):
     main_loop.draw_screen()
     update_data = get_update()
-    if isinstance(update_data, list) and update_data:
+    
+    #if isinstance(update_data, list) and update_data:
+    if update_data:
         quote_box.base_widget.set_text(update_data)
     else:
         quote_box.base_widget.set_text([('error', "Unable to fetch updates. Please try again later.")])
