@@ -7,8 +7,9 @@
 
 - It's pretty simple but if you wanna read through a blog post instead: https://aranair.github.io/posts/2017/06/28/building-a-python-cli-stock-ticker-with-urwid/
 
-Here is a flow diagram of how this works:
+## Flow Diagram
 
+```
 [Start]
    |
    v
@@ -39,7 +40,7 @@ Here is a flow diagram of how this works:
    |
    v
 [Repeat main loop]
-
+```
 
 **NOTE!!**
 This uses https://www.alphavantage.co because Google Finance does not seem to work reliably anymore (IPs get blocked and it just plain out doesn't work), and also the Polygon API is a bit more reliable.
