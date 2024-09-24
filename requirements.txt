@@ -1,3 +1,4 @@
 urwid
 HTMLParser
 simplejson
+requests

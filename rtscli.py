@@ -1,5 +1,8 @@
 import urwid
 import requests
+import re
+from datetime import date
+import json
 try:
     # For Python 3.0 and later
     from urllib.request import urlopen
@@ -32,7 +35,9 @@ with open("alphavantage-creds.txt") as file:
     
 
 with open("polygon-creds.txt") as file:
-    polygon_apikey = list(parse_lines(file.readlines()))[0]
+    #polygon_apikey = list(parse_lines(file.readlines()))[0]
+    polygon_apikey = file.read().strip()
+    print(f"Debug: Polygon API Key (last 4 chars): ...{polygon_apikey[-4:]}")
 
 
 # Set up color scheme
@@ -89,8 +94,7 @@ def calculate_gain(price_in, current_price, shares):
 #Get Stock Data Update
 def get_update():
     results = []
-    use_polygon = False  # Initialize use_polygon at the beginning of the function
-    
+    use_polygon = False  # Initialize use_polygon at the beginning of the function 
     try:
         for t in tickers:
             ticker_sym = t[1]
@@ -107,9 +111,28 @@ def get_update():
             
             if use_polygon:
                 # Polygon.io API call
+                today = date.today().isoformat()
+                #url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/range/1/day{today}/{today}?apiKey={polygon_apikey}"
                 url = f"https://api.polygon.io/v2/aggs/ticker/{ticker_sym}/prev?apiKey={polygon_apikey}"
-                response = requests.get(url)
-                res = response.json()
+                headers = {"Authorization": f"Bearer {polygon_apikey}"}
+                
+                # Debug: Print redacted URL
+                redacted_url = re.sub(r'apiKey=\w+', 'apiKey=REDACTED', url)
+                print(f"Debug: Requesting URL: {redacted_url}")
+                
+                response = requests.get(url, headers=headers)
+                print(f"Debug: Response status code: {response.status_code}")
+                print(f"Debug: Response content: {response.text[:100]}...")
+    
+                if response.status_code == 200:
+                    res = response.json()
+                    
+                # Process the response as before
+                else:
+                    print(f"Error: Received status code {response.status_code}")
+                    print(f"Response content: {response.text}")
+                    continue  # Skip to the next ticker
+                
                 if "results" in res and res["results"]:
                     polygon_data = res["results"][0]
                     results.append({
@@ -144,7 +167,6 @@ def get_update():
     except Exception as err:
         print(f"Error in get_update: {err}")
         return [('error', f"Error fetching data: {err}. Please try again later.")]
-
 # Handle key presses
 def handle_input(key):
     if key == 'R' or key == 'r':
