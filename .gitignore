@@ -1,6 +1,9 @@
 tickers.txt
 alphavantage-creds.txt
-polygon-creds.txtq
+polygon-creds.txt
+
+#python venv dir
+venv/
 
 # Compiled python modules.
 *.pyc
